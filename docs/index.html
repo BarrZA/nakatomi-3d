@@ -66,15 +66,18 @@
     camera.position.set(26,24,30);
 
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 10, 0);   // look 10m up the tower’s center
+controls.update();
+camera.lookAt(0, 10, 0);
     controls.enableDamping = true;
     controls.dampingFactor = 0.12;
     controls.minDistance = 18;
     controls.maxDistance = 90;
     controls.maxPolarAngle = Math.PI/2.05;
 
-    const ambient = new THREE.AmbientLight(0xffffff, 0.15);
+    const ambient = new THREE.AmbientLight(0xffffff, 0.35);
     scene.add(ambient);
-    const dir = new THREE.DirectionalLight(0xffffff, 0.6);
+    const dir = new THREE.DirectionalLight(0xffffff, 1.25);
     dir.position.set(-20,30,15);
     dir.castShadow = true;
     dir.shadow.mapSize.set(2048,2048);
