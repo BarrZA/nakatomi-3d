@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Nakatomi Plaza 1988 – Online</title>
+  <title>Nakatomi Plaza 1988 – 3D (GitHub Pages)</title>
   <style>
     html, body, #root { margin:0; padding:0; width:100%; height:100%; background:#000; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
     .hint { position:absolute; bottom:16px; left:50%; transform:translateX(-50%); font-size:12px; color:rgba(255,255,255,0.9); background:rgba(0,0,0,0.4); border-radius:999px; padding:6px 10px; }
@@ -59,7 +59,7 @@
           React.createElement('boxGeometry', { args: [8, 0.5, 2] }),
           React.createElement('meshStandardMaterial', { color:"#2b2f34" })
         ),
-        // Limo
+        // Limo (easter egg)
         React.createElement('group', { position:[3.5, 0.6, 6.5] },
           React.createElement('mesh', { castShadow:true, receiveShadow:true },
             React.createElement('boxGeometry', { args:[3.6, 0.6, 1.2] }),
@@ -115,7 +115,7 @@
           React.createElement('boxGeometry', { args:[2.2, 0.06, 0.2] }),
           React.createElement('meshStandardMaterial', { color:"#4b4b4b" })
         ),
-        React.createElement('mesh', { position:[0, podiumSize[1] + towerSize[1] + midSetback[1] + crownSize[1] - 1.44, 0.0] },
+        React.createElement('mesh', { position:[0, 0, 0] },
           React.createElement('boxGeometry', { args:[0.2, 0.06, 1.8] }),
           React.createElement('meshStandardMaterial', { color:"#4b4b4b" })
         ),
