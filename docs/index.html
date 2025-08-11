@@ -1,276 +1,281 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Nakatomi Plaza 1988 – 3D (GitHub Pages)</title>
-  <style>
-    html, body, #root { margin:0; padding:0; width:100%; height:100%; background:#000; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
-    .hint { position:absolute; bottom:16px; left:50%; transform:translateX(-50%); font-size:12px; color:rgba(255,255,255,0.9); background:rgba(0,0,0,0.4); border-radius:999px; padding:6px 10px; }
-    .toggle { position:absolute; top:16px; right:16px; background:rgba(255,255,255,0.85); backdrop-filter: blur(6px); border-radius:16px; padding:6px 10px; box-shadow: 0 6px 16px rgba(0,0,0,0.15); display:flex; align-items:center; gap:8px; font-size:12px; font-weight:600; }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Nakatomi Plaza 1988 — Pure Three.js</title>
+<style>
+  html, body { margin:0; height:100%; background:#000; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
+  #app { position:fixed; inset:0; }
+  .ui { position:fixed; top:12px; right:12px; background:rgba(255,255,255,.9); padding:8px 10px; border-radius:12px; font-size:12px; font-weight:600; }
+  .hint { position:fixed; bottom:12px; left:50%; transform:translateX(-50%); color:#fff; font-size:12px; background:rgba(0,0,0,.45); padding:6px 10px; border-radius:999px; }
+</style>
 </head>
 <body>
-  <div id="root"></div>
+<div id="app"></div>
+<div class="ui">Day <input id="toggle" type="checkbox" checked /> Night</div>
+<div class="hint">Drag to orbit • Scroll to zoom</div>
 
-  <script type="module">
-    import React, { useMemo, useRef, useState } from 'https://esm.sh/react@18.2.0';
-    import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
-    import * as THREE from 'https://esm.sh/three@0.164.1';
-    import { Canvas, useFrame } from 'https://esm.sh/@react-three/fiber@8.15.15?deps=three@0.164.1&external=react,react-dom';
-    import { OrbitControls, Html } from 'https://esm.sh/@react-three/drei@9.88.7?deps=three@0.164.1&external=react,react-dom,@react-three/fiber';
+<!-- Only dependency: Three.js UMD build (widely allowed) -->
+<script src="https://unpkg.com/three@0.152.2/build/three.min.js"></script>
+<script src="https://unpkg.com/three@0.152.2/examples/js/controls/OrbitControls.js"></script>
 
-    function WindowStripeMaterial({ color = "#9fb4c7" }) {
-      const mat = useMemo(() => new THREE.MeshStandardMaterial({ color, metalness: 0.6, roughness: 0.25 }), [color]);
-      return React.createElement('primitive', { object: mat, attach: 'material' });
+<script>
+(function(){
+  const app = document.getElementById('app');
+  const renderer = new THREE.WebGLRenderer({ antialias:true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  app.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  const nightColor = new THREE.Color('#0d1117');
+  const dayColor = new THREE.Color('#cfe3ff');
+  scene.background = nightColor;
+  scene.fog = new THREE.Fog(scene.background, 60, 160);
+
+  const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 500);
+  camera.position.set(26,24,30);
+
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.12;
+  controls.minDistance = 18;
+  controls.maxDistance = 90;
+  controls.maxPolarAngle = Math.PI/2.05;
+
+  // Lights
+  const ambient = new THREE.AmbientLight(0xffffff, 0.15);
+  scene.add(ambient);
+  const dir = new THREE.DirectionalLight(0xffffff, 0.6);
+  dir.position.set(-20,30,15);
+  dir.castShadow = true;
+  dir.shadow.mapSize.set(2048,2048);
+  scene.add(dir);
+
+  // Ground + tiles
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(120,120),
+    new THREE.MeshStandardMaterial({ color:'#dadfe6' })
+  );
+  ground.rotation.x = -Math.PI/2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  const tiles = new THREE.Group();
+  for(let i=0;i<24;i++){
+    const x = (i%6-2.5)*7;
+    const z = (Math.floor(i/6)-2.5)*7;
+    const tile = new THREE.Mesh(
+      new THREE.PlaneGeometry(6.5,6.5),
+      new THREE.MeshStandardMaterial({ color: (i%2===0)?'#e9edf3':'#f2f5f9' })
+    );
+    tile.rotation.x = -Math.PI/2;
+    tile.position.set(x,0.01,z);
+    tile.receiveShadow = true;
+    tiles.add(tile);
+  }
+  scene.add(tiles);
+
+  // Building group
+  const building = new THREE.Group();
+  scene.add(building);
+
+  // Podium
+  const podium = new THREE.Mesh(
+    new THREE.BoxGeometry(18,2,18),
+    new THREE.MeshStandardMaterial({ color:'#3a3f45', roughness:0.7, metalness:0.1 })
+  );
+  podium.position.y = 1;
+  podium.castShadow = podium.receiveShadow = true;
+  building.add(podium);
+
+  // Entrance canopy
+  const canopy = new THREE.Mesh(
+    new THREE.BoxGeometry(8,0.5,2),
+    new THREE.MeshStandardMaterial({ color:'#2b2f34' })
+  );
+  canopy.position.set(0, 2+0.25, 7.8);
+  canopy.castShadow = canopy.receiveShadow = true;
+  building.add(canopy);
+
+  // Limo (easter egg)
+  const limoBody = new THREE.Mesh(
+    new THREE.BoxGeometry(3.6,0.6,1.2),
+    new THREE.MeshStandardMaterial({ color:'#111' })
+  );
+  limoBody.position.set(3.5, 0.6, 6.5);
+  limoBody.castShadow = limoBody.receiveShadow = true;
+  building.add(limoBody);
+
+  const limoTop = new THREE.Mesh(
+    new THREE.BoxGeometry(3.2,0.2,1.1),
+    new THREE.MeshStandardMaterial({ color:'#0c0c0c' })
+  );
+  limoTop.position.set(3.5, 0.95, 6.5);
+  building.add(limoTop);
+
+  function wheel(x,z){
+    const w = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.22,0.22,0.4,16),
+      new THREE.MeshStandardMaterial({ color:'#222' })
+    );
+    w.rotation.z = Math.PI/2;
+    w.position.set(3.5+x, 0.8, 6.5+z);
+    return w;
+  }
+  building.add(wheel(-1.4,-0.45), wheel(-1.4,0.45), wheel(1.4,-0.45), wheel(1.4,0.45));
+
+  // Main tower
+  const tower = new THREE.Mesh(
+    new THREE.BoxGeometry(12,28,12),
+    new THREE.MeshStandardMaterial({ color:'#4a4f57', roughness:0.6, metalness:0.2 })
+  );
+  tower.position.y = 2 + 28/2;
+  tower.castShadow = tower.receiveShadow = true;
+  building.add(tower);
+
+  // Window stripes
+  const stripeMat = new THREE.MeshStandardMaterial({ color:'#9fb4c7', metalness:0.6, roughness:0.25 });
+  for(let i=0;i<14;i++){
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(11.9,0.18,11.9), stripeMat);
+    stripe.position.set(0, 2 + 1 + i*2, 0);
+    stripe.receiveShadow = true;
+    building.add(stripe);
+  }
+
+  // Mid setback
+  const mid = new THREE.Mesh(
+    new THREE.BoxGeometry(10,6,10),
+    new THREE.MeshStandardMaterial({ color:'#434853' })
+  );
+  mid.position.y = 2 + 28 + 6/2 - 1;
+  mid.castShadow = mid.receiveShadow = true;
+  building.add(mid);
+
+  for(let i=0;i<3;i++){
+    const mstripe = new THREE.Mesh(new THREE.BoxGeometry(9.9,0.15,9.9), stripeMat);
+    mstripe.position.y = 2 + 28 + i*1.5;
+    building.add(mstripe);
+  }
+
+  // Crown
+  const crown = new THREE.Mesh(
+    new THREE.BoxGeometry(8,4,8),
+    new THREE.MeshStandardMaterial({ color:'#3c414b' })
+  );
+  crown.position.y = 2 + 28 + 6 + 4/2 - 1.5;
+  crown.castShadow = crown.receiveShadow = true;
+  building.add(crown);
+
+  // Helipad + H + mast
+  const helipad = new THREE.Mesh(
+    new THREE.CylinderGeometry(3.5,3.5,0.12,48),
+    new THREE.MeshStandardMaterial({ color:'#d6d7d8' })
+  );
+  helipad.position.y = 2 + 28 + 6 + 4 - 1.5;
+  helipad.receiveShadow = true;
+  building.add(helipad);
+
+  const hbar1 = new THREE.Mesh(new THREE.BoxGeometry(2.2,0.06,0.2), new THREE.MeshStandardMaterial({ color:'#4b4b4b' }));
+  hbar1.position.y = helipad.position.y - 0.06;
+  building.add(hbar1);
+  const hbar2 = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.06,1.8), new THREE.MeshStandardMaterial({ color:'#4b4b4b' }));
+  hbar2.position.y = helipad.position.y - 0.06;
+  building.add(hbar2);
+
+  const mast = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.08,0.08,2.5,8),
+    new THREE.MeshStandardMaterial({ color:'#888' })
+  );
+  mast.position.y = 2 + 28 + 6 + 4 + 0.5 - 1.5;
+  building.add(mast);
+
+  // Debris
+  for(let i=0;i<12;i++){
+    const d = new THREE.Mesh(
+      new THREE.BoxGeometry(Math.random()*0.3+0.05, 0.05, Math.random()*0.3+0.05),
+      new THREE.MeshStandardMaterial({ color:'#7a7a7a', roughness:0.9 })
+    );
+    d.position.set((Math.random()-0.5)*5, crown.position.y - 0.3, (Math.random()-0.5)*5);
+    building.add(d);
+  }
+
+  // Vents (easter egg)
+  const ventCol = new THREE.Group(); ventCol.position.set(5.9, 2+10, 0);
+  const ventPost = new THREE.Mesh(new THREE.BoxGeometry(0.1,2,2), new THREE.MeshStandardMaterial({ color:'#565d69' }));
+  ventCol.add(ventPost);
+  for(let i=0;i<4;i++){
+    const duct = new THREE.Mesh(new THREE.BoxGeometry(0.6,0.08,1.6), new THREE.MeshStandardMaterial({ color:'#737c88', metalness:0.4, roughness:0.6 }));
+    duct.position.set(-0.4, -0.7 + i*0.45, 0);
+    ventCol.add(duct);
+  }
+  const ventLight = new THREE.PointLight(0xffc080, 0.8, 2);
+  ventLight.position.set(-0.5, 0.2, 0);
+  ventCol.add(ventLight);
+  building.add(ventCol);
+
+  // Vault (easter egg)
+  const vault = new THREE.Group(); vault.position.set(-5.9, 2+6, 0);
+  vault.add(new THREE.Mesh(new THREE.BoxGeometry(0.1,2,2), new THREE.MeshStandardMaterial({ color:'#2a2e35' })));
+  const vaultBody = new THREE.Mesh(new THREE.BoxGeometry(1.2,1.6,1.6), new THREE.MeshStandardMaterial({ color:'#1b1f27' }));
+  vaultBody.position.x = 0.7; vault.add(vaultBody);
+  const vaultPanel = new THREE.Mesh(new THREE.BoxGeometry(1,0.1,1.4), new THREE.MeshStandardMaterial({ color:'#d7c48a' }));
+  vaultPanel.position.set(0.7, -0.2, 0); vault.add(vaultPanel);
+  building.add(vault);
+
+  // "Ho Ho Ho" sign
+  const sign = new THREE.Group(); sign.position.set(0, 2+6, -6.1);
+  sign.add(new THREE.Mesh(new THREE.BoxGeometry(1.8,1.1,0.06), new THREE.MeshStandardMaterial({ color:'#a10d0d' })));
+  const stripe1 = new THREE.Mesh(new THREE.BoxGeometry(1.6,0.18,0.02), new THREE.MeshStandardMaterial({ color:'#ffffff' }));
+  stripe1.position.z = -0.035; sign.add(stripe1);
+  const stripe2 = new THREE.Mesh(new THREE.BoxGeometry(1.2,0.18,0.02), new THREE.MeshStandardMaterial({ color:'#ffffff' }));
+  stripe2.position.set(0,-0.22,-0.035); sign.add(stripe2);
+  building.add(sign);
+
+  // Night window lights
+  const nightGroup = new THREE.Group();
+  function randomLights(n=60){
+    for(let i=0;i<n;i++){
+      const pl = new THREE.PointLight(0xffffff, 0.25, 6);
+      pl.position.set((Math.random()-0.5)*10, 2 + Math.random()*32, (Math.random()-0.5)*10);
+      nightGroup.add(pl);
     }
+  }
+  randomLights(60);
+  scene.add(nightGroup);
 
-    function Hint({ position = [0,0,0], text = "" }) {
-      const [hover, setHover] = useState(false);
-      return React.createElement(
-        'group',
-        { position },
-        React.createElement('mesh', { onPointerOver:()=>setHover(true), onPointerOut:()=>setHover(false) },
-          React.createElement('sphereGeometry', { args:[0.06, 12, 12] }),
-          React.createElement('meshStandardMaterial', { emissive: "#ffd166", emissiveIntensity: 1.5, color: "#333" })
-        ),
-        hover && React.createElement(Html, { center: true },
-          React.createElement('div', { style:{ padding:"4px 6px", background:"rgba(0,0,0,0.7)", color:"white", fontSize:11, borderRadius:6, whiteSpace:"nowrap" } }, text)
-        )
-      );
-    }
+  // Day/Night toggle
+  const toggle = document.getElementById('toggle');
+  function applyMode(){
+    const night = toggle.checked;
+    ambient.intensity = night ? 0.15 : 0.4;
+    dir.intensity = night ? 0.6 : 1.2;
+    dir.position.set(night ? -20 : 20, 30, 15);
+    scene.background = night ? nightColor : dayColor;
+    scene.fog.color.set(scene.background);
+    nightGroup.visible = night;
+  }
+  toggle.addEventListener('change', applyMode);
+  applyMode();
 
-    function Building() {
-      const podiumSize = [18, 2, 18];
-      const towerSize = [12, 28, 12];
-      const midSetback = [10, 6, 10];
-      const crownSize = [8, 4, 8];
+  // Resize
+  window.addEventListener('resize', ()=>{
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
 
-      return React.createElement(
-        'group',
-        null,
-        // Podium
-        React.createElement('mesh', { position:[0, podiumSize[1]/2, 0], castShadow:true, receiveShadow:true },
-          React.createElement('boxGeometry', { args: podiumSize }),
-          React.createElement('meshStandardMaterial', { color:"#3a3f45", roughness:0.7, metalness:0.1 })
-        ),
-        // Entrance canopy
-        React.createElement('mesh', { position:[0, podiumSize[1] + 0.25, 7.8], castShadow:true, receiveShadow:true },
-          React.createElement('boxGeometry', { args: [8, 0.5, 2] }),
-          React.createElement('meshStandardMaterial', { color:"#2b2f34" })
-        ),
-        // Limo (easter egg)
-        React.createElement('group', { position:[3.5, 0.6, 6.5] },
-          React.createElement('mesh', { castShadow:true, receiveShadow:true },
-            React.createElement('boxGeometry', { args:[3.6, 0.6, 1.2] }),
-            React.createElement('meshStandardMaterial', { color:"#111" })
-          ),
-          React.createElement('mesh', { position:[0, 0.35, 0], castShadow:true },
-            React.createElement('boxGeometry', { args:[3.2, 0.2, 1.1] }),
-            React.createElement('meshStandardMaterial', { color:"#0c0c0c" })
-          ),
-          ...[-1.4, 1.4].flatMap(x => [-0.45, 0.45].map((z, i) =>
-            React.createElement('mesh', { key:`${x}-${z}-${i}`, position:[x, 0.2, z] },
-              React.createElement('cylinderGeometry', { args:[0.22, 0.22, 0.4, 16] }),
-              React.createElement('meshStandardMaterial', { color:"#222" }),
-              React.createElement('rotation', { args:[Math.PI/2, 0, 0] })
-            )
-          ))
-        ),
-        // Tower
-        React.createElement('mesh', { position:[0, podiumSize[1] + towerSize[1]/2, 0], castShadow:true, receiveShadow:true },
-          React.createElement('boxGeometry', { args: towerSize }),
-          React.createElement('meshStandardMaterial', { color:"#4a4f57", roughness:0.6, metalness:0.2 })
-        ),
-        // Window stripes
-        ...Array.from({ length: 14 }).map((_, i) =>
-          React.createElement('mesh', { key:i, position:[0, podiumSize[1] + 1 + i * 2, 0], receiveShadow:true },
-            React.createElement('boxGeometry', { args:[11.9, 0.18, 11.9] }),
-            React.createElement(WindowStripeMaterial, null)
-          )
-        ),
-        // Mid setback
-        React.createElement('mesh', { position:[0, podiumSize[1] + towerSize[1] + midSetback[1]/2 - 1, 0], castShadow:true, receiveShadow:true },
-          React.createElement('boxGeometry', { args: midSetback }),
-          React.createElement('meshStandardMaterial', { color:"#434853" })
-        ),
-        ...Array.from({ length: 3 }).map((_, i) =>
-          React.createElement('mesh', { key:`mws-${i}`, position:[0, podiumSize[1] + towerSize[1] + i * 1.5, 0] },
-            React.createElement('boxGeometry', { args:[9.9, 0.15, 9.9] }),
-            React.createElement(WindowStripeMaterial, null)
-          )
-        ),
-        // Crown
-        React.createElement('mesh', { position:[0, podiumSize[1] + towerSize[1] + midSetback[1] + crownSize[1]/2 - 1.5, 0], castShadow:true, receiveShadow:true },
-          React.createElement('boxGeometry', { args: crownSize }),
-          React.createElement('meshStandardMaterial', { color:"#3c414b" })
-        ),
-        // Helipad
-        React.createElement('mesh', { position:[0, podiumSize[1] + towerSize[1] + midSetback[1] + crownSize[1] - 1.5, 0], receiveShadow:true },
-          React.createElement('cylinderGeometry', { args:[3.5, 3.5, 0.12, 48] }),
-          React.createElement('meshStandardMaterial', { color:"#d6d7d8" })
-        ),
-        // Helipad H
-        React.createElement('mesh', { position:[0, podiumSize[1] + towerSize[1] + midSetback[1] + crownSize[1] - 1.44, 0.0] },
-          React.createElement('boxGeometry', { args:[2.2, 0.06, 0.2] }),
-          React.createElement('meshStandardMaterial', { color:"#4b4b4b" })
-        ),
-        React.createElement('mesh', { position:[0, 0, 0] },
-          React.createElement('boxGeometry', { args:[0.2, 0.06, 1.8] }),
-          React.createElement('meshStandardMaterial', { color:"#4b4b4b" })
-        ),
-        // Mast
-        React.createElement('mesh', { position:[0, podiumSize[1] + towerSize[1] + midSetback[1] + crownSize[1] + 0.5 - 1.5, 0] },
-          React.createElement('cylinderGeometry', { args:[0.08, 0.08, 2.5, 8] }),
-          React.createElement('meshStandardMaterial', { color:"#888" })
-        ),
-        // Debris
-        ...Array.from({ length: 12 }).map((_, i) =>
-          React.createElement('mesh', { key:`deb-${i}`, position:[(Math.random()-0.5)*5, podiumSize[1] + towerSize[1] + midSetback[1] + crownSize[1] - 1.8, (Math.random()-0.5)*5] },
-            React.createElement('boxGeometry', { args:[Math.random()*0.3+0.05, 0.05, Math.random()*0.3+0.05] }),
-            React.createElement('meshStandardMaterial', { color:"#7a7a7a", roughness:0.9 })
-          )
-        ),
-        // Vault
-        React.createElement('group', { position:[-5.9, podiumSize[1] + 6, 0] },
-          React.createElement('mesh', { position:[0.05, 0, 0] },
-            React.createElement('boxGeometry', { args:[0.1, 2, 2] }),
-            React.createElement('meshStandardMaterial', { color:"#2a2e35" })
-          ),
-          React.createElement('mesh', { position:[0.7, 0, 0] },
-            React.createElement('boxGeometry', { args:[1.2, 1.6, 1.6] }),
-            React.createElement('meshStandardMaterial', { color:"#1b1f27" })
-          ),
-          React.createElement('mesh', { position:[0.7, -0.2, 0] },
-            React.createElement('boxGeometry', { args:[1, 0.1, 1.4] }),
-            React.createElement('meshStandardMaterial', { color:"#d7c48a" })
-          ),
-          React.createElement(Hint, { position:[0.7, 1.1, 0], text:"Easter Egg: The vault" })
-        ),
-        // Vents
-        React.createElement('group', { position:[5.9, podiumSize[1] + 10, 0] },
-          React.createElement('mesh', null,
-            React.createElement('boxGeometry', { args:[0.1, 2, 2] }),
-            React.createElement('meshStandardMaterial', { color:"#565d69" })
-          ),
-          ...Array.from({ length: 4 }).map((_, i) =>
-            React.createElement('mesh', { key:`duct-${i}`, position:[-0.4, -0.7 + i*0.45, 0] },
-              React.createElement('boxGeometry', { args:[0.6, 0.08, 1.6] }),
-              React.createElement('meshStandardMaterial', { color:"#737c88", metalness:0.4, roughness:0.6 })
-            )
-          ),
-          React.createElement('pointLight', { position:[-0.5, 0.2, 0], intensity:0.8, distance:2, color:new THREE.Color(1,0.75,0.5) }),
-          React.createElement(Hint, { position:[-0.2, 1.1, 0], text:"Easter Egg: the vents" })
-        ),
-        // Teddy bear
-        React.createElement('group', { position:[-2, podiumSize[1] + 0.9, -6.2] },
-          React.createElement('mesh', { position:[0, 0.2, 0] },
-            React.createElement('cylinderGeometry', { args:[0.2, 0.2, 0.12, 12] }),
-            React.createElement('meshStandardMaterial', { color:"#b99362" })
-          ),
-          React.createElement('mesh', { position:[0, 0.35, 0] },
-            React.createElement('sphereGeometry', { args:[0.2, 16, 16] }),
-            React.createElement('meshStandardMaterial', { color:"#a3784e" })
-          ),
-          React.createElement('mesh', { position:[0, 0.55, 0] },
-            React.createElement('sphereGeometry', { args:[0.14, 16, 16] }),
-            React.createElement('meshStandardMaterial', { color:"#a3784e" })
-          ),
-          React.createElement(Hint, { position:[0.2, 0.9, 0], text:"Easter Egg: teddy in the limo" })
-        ),
-        // Ho Ho Ho sign
-        React.createElement('group', { position:[0, podiumSize[1] + 6, -6.1] },
-          React.createElement('mesh', null,
-            React.createElement('boxGeometry', { args:[1.8, 1.1, 0.06] }),
-            React.createElement('meshStandardMaterial', { color:"#a10d0d" })
-          ),
-          React.createElement('mesh', { position:[0, 0, -0.035] },
-            React.createElement('boxGeometry', { args:[1.6, 0.18, 0.02] }),
-            React.createElement('meshStandardMaterial', { color:"#ffffff" })
-          ),
-          React.createElement('mesh', { position:[0, -0.22, -0.035] },
-            React.createElement('boxGeometry', { args:[1.2, 0.18, 0.02] }),
-            React.createElement('meshStandardMaterial', { color:"#ffffff" })
-          ),
-          React.createElement(Hint, { position:[0, 0.9, 0], text:"Easter Egg: 'Ho Ho Ho' jumper" })
-        )
-      );
-    }
-
-    function PlazaGround() {
-      return React.createElement(
-        'group',
-        null,
-        React.createElement('mesh', { rotation:[-Math.PI/2, 0, 0], receiveShadow:true },
-          React.createElement('planeGeometry', { args:[120, 120] }),
-          React.createElement('meshStandardMaterial', { color:"#dadfe6" })
-        ),
-        ...Array.from({ length: 24 }).map((_, i) =>
-          React.createElement('mesh', { key:`tile-${i}`, position:[(i%6 - 2.5) * 7, 0.01, (Math.floor(i/6) - 2.5) * 7], rotation:[-Math.PI/2, 0, 0], receiveShadow:true },
-            React.createElement('planeGeometry', { args:[6.5, 6.5] }),
-            React.createElement('meshStandardMaterial', { color:(i%2===0) ? "#e9edf3" : "#f2f5f9" })
-          )
-        ),
-        React.createElement('group', { position:[0, 0.8, -10] },
-          React.createElement('mesh', null,
-            React.createElement('boxGeometry', { args:[4.6, 1.4, 0.2] }),
-            React.createElement('meshStandardMaterial', { color:"#2d333a" })
-          ),
-          React.createElement(Html, { center:true, position:[0, 0, 0.12] },
-            React.createElement('div', { style:{ color:"white", textAlign:"center", letterSpacing:2 } },
-              React.createElement('div', { style:{ fontSize:14, opacity:0.75 } }, "NAKATOMI"),
-              React.createElement('div', { style:{ fontSize:24, fontWeight:700 } }, "PLAZA"),
-              React.createElement('div', { style:{ fontSize:10, opacity:0.6 } }, "1988")
-            )
-          )
-        )
-      );
-    }
-
-    function DayNightToggle({ value, onChange }) {
-      return React.createElement('div', { className:'toggle' },
-        React.createElement('span', null, value ? "Night" : "Day"),
-        React.createElement('input', { type:'checkbox', checked:value, onChange:(e)=>onChange(e.target.checked) })
-      );
-    }
-
-    function Scene() {
-      const [night, setNight] = useState(true);
-      const dir = useRef();
-      useFrame(() => {
-        if (dir.current) {
-          dir.current.position.set(20 * (night ? -1 : 1), 30, 15);
-          dir.current.intensity = night ? 0.6 : 1.2;
-        }
-      });
-
-      return React.createElement(
-        'div', { style:{ width:"100%", height:"100%" } },
-        React.createElement(DayNightToggle, { value:night, onChange:setNight }),
-        React.createElement(Canvas, { shadows:true, camera:{ position:[26, 24, 30], fov:45 } },
-          React.createElement('color', { attach:'background', args:[night ? "#0d1117" : "#cfe3ff"] }),
-          React.createElement('fog', { attach:'fog', args:[night ? "#0d1117" : "#cfe3ff", 60, 160] }),
-          React.createElement('ambientLight', { intensity:night ? 0.15 : 0.4 }),
-          React.createElement('directionalLight', { ref:dir, castShadow:true, position:[20, 30, 15], intensity:1.2, 'shadow-mapSize-width':2048, 'shadow-mapSize-height':2048 }),
-          night && React.createElement('group', null,
-            ...Array.from({ length: 60 }).map((_, i) =>
-              React.createElement('pointLight', { key:i, position:[(Math.random()-0.5)*10, 2 + Math.random()*32, (Math.random()-0.5)*10], intensity:0.25, distance:6 })
-            )
-          ),
-          React.createElement(PlazaGround, null),
-          React.createElement(Building, null),
-          React.createElement(OrbitControls, { enableDamping:true, dampingFactor:0.12, minDistance:18, maxDistance:90, maxPolarAngle:Math.PI/2.05 })
-        ),
-        React.createElement('div', { className:'hint' }, "Drag to orbit • Scroll to zoom • Toggle for day/night")
-      );
-    }
-
-    function App() {
-      return React.createElement('div', { style:{ width:"100%", height:"100vh", background:"black" } }, React.createElement(Scene, null));
-    }
-
-    const root = createRoot(document.getElementById('root'));
-    root.render(React.createElement(App));
-  </script>
+  // Animate
+  const clock = new THREE.Clock();
+  function animate(){
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+  }
+  animate();
+})();
+</script>
 </body>
 </html>
